@@ -54,6 +54,24 @@
       display: none;
       z-index: 3;
     }
+    #levelDisplay {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      font-size: 20px;
+      font-weight: bold;
+      z-index: 4;
+    }
+    #levelUpMessage {
+      position: absolute;
+      top: 45%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 2.5em;
+      color: blue;
+      display: none;
+      z-index: 4;
+    }
   </style>
 </head>
 <body>
@@ -61,6 +79,8 @@
     <div id="player" draggable="true"></div>
     <div id="gameOver">Game Over!</div>
     <button id="restartBtn">Play Again</button>
+    <div id="levelDisplay">Level: 1</div>
+    <div id="levelUpMessage">Level up!</div>
   </div>
 
   <script>
@@ -68,12 +88,21 @@
     const player = document.getElementById("player");
     const gameOverText = document.getElementById("gameOver");
     const restartBtn = document.getElementById("restartBtn");
+    const levelDisplay = document.getElementById("levelDisplay");
+    const levelUpMsg = document.getElementById("levelUpMessage");
 
     let isDragging = false;
     const snakeBody = [];
     const maxSegments = 10;
 
-    // Enable dragging the player
+    let level = 1;
+    const maxLevel = 10;
+    let fallSpeed = 5;
+    let spawnRate = 1000;
+    let gameOver = false;
+    let spawner;
+
+    // Enable dragging
     player.addEventListener("mousedown", () => { isDragging = true; });
     document.addEventListener("mouseup", () => { isDragging = false; });
 
@@ -81,14 +110,10 @@
       if (isDragging) {
         let x = e.clientX - player.offsetWidth / 2;
         let y = e.clientY - player.offsetHeight / 2;
-
-        // Clamp to screen
         x = Math.max(0, Math.min(x, window.innerWidth - player.offsetWidth));
         y = Math.max(0, Math.min(y, window.innerHeight - player.offsetHeight));
-
         player.style.left = x + "px";
         player.style.top = y + "px";
-
         updateSnakeBody(x, y);
       }
     });
@@ -104,15 +129,15 @@
       segment.style.top = y + "px";
       gameArea.appendChild(segment);
       snakeBody.push(segment);
-
       if (snakeBody.length > maxSegments) {
         const oldSegment = snakeBody.shift();
         oldSegment.remove();
       }
     }
 
-    // Create falling obstacles
     function createObstacle() {
+      if (gameOver) return;
+
       const obstacle = document.createElement("div");
       obstacle.classList.add("obstacle");
       obstacle.style.left = Math.random() * (window.innerWidth - 40) + "px";
@@ -120,10 +145,9 @@
 
       let y = 0;
       const fall = setInterval(() => {
-        y += 5;
+        y += fallSpeed;
         obstacle.style.top = y + "px";
 
-        // Collision detection
         const playerRect = player.getBoundingClientRect();
         const obstacleRect = obstacle.getBoundingClientRect();
         if (
@@ -134,11 +158,12 @@
         ) {
           gameOverText.style.display = "block";
           restartBtn.style.display = "block";
+          gameOver = true;
           clearInterval(fall);
+          clearInterval(levelTimer);
           clearInterval(spawner);
         }
 
-        // Remove if off screen
         if (y > window.innerHeight) {
           obstacle.remove();
           clearInterval(fall);
@@ -146,12 +171,52 @@
       }, 20);
     }
 
-    const spawner = setInterval(createObstacle, 1000);
+    function startSpawner() {
+      if (spawner) clearInterval(spawner);
+      spawner = setInterval(() => {
+        const blocksToSpawn = level;
+        for (let i = 0; i < blocksToSpawn; i++) {
+          setTimeout(() => {
+            createObstacle();
+          }, Math.random() * 800); // Random delay for each block
+        }
+      }, spawnRate);
+    }
 
-    // Restart button reloads the game
+    // Start first wave
+    startSpawner();
+
+    // Level system every 10 seconds
+    const levelTimer = setInterval(() => {
+      if (level < maxLevel) {
+        level++;
+        fallSpeed += 2;
+        spawnRate = Math.max(200, spawnRate - 80);
+        levelDisplay.textContent = "Level: " + level;
+        startSpawner();
+
+        // Show "Level up!" message
+        levelUpMsg.style.display = "block";
+        setTimeout(() => {
+          levelUpMsg.style.display = "none";
+        }, 1500);
+      } else {
+        clearInterval(levelTimer);
+        if (!gameOver) {
+          setTimeout(() => {
+            gameOverText.textContent = "You won!";
+            gameOverText.style.display = "block";
+            restartBtn.style.display = "block";
+            clearInterval(spawner);
+          }, 10000); // wait one last level duration
+        }
+      }
+    }, 10000); // level up every 10s
+
     restartBtn.addEventListener("click", () => {
       location.reload();
     });
   </script>
 </body>
 </html>
+
